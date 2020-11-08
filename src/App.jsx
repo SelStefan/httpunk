@@ -13,6 +13,7 @@ import "./App.css";
 // inlet/outlet pin display name when some key is pressed
 // Display an error if there two nodes with the same if
 // Display an error if there are two outlet pins with the same name within a node
+// Implement a method that calculates pin positions
 
 class App extends React.Component {
 	constructor(props) {
@@ -48,6 +49,7 @@ class App extends React.Component {
 			}).required(),
 			cableDrag: Joi.object({
 				isDragging: Joi.bool().required(),
+				origin: Joi.string().allow(null).required(),
 				initialPos: Joi.object({
 					x: Joi.number().required(),
 					y: Joi.number().required(),
@@ -57,6 +59,9 @@ class App extends React.Component {
 					y: Joi.number().required(),
 				}).required(),
 			}).required(),
+			cableConnections: Joi.array()
+				.items(Joi.array().items(Joi.string()).length(2))
+				.required(),
 		});
 
 		const initialState = {
@@ -100,6 +105,7 @@ class App extends React.Component {
 			},
 			cableDrag: {
 				isDragging: false,
+				origin: null,
 				initialPos: {
 					x: 0,
 					y: 0,
@@ -109,6 +115,10 @@ class App extends React.Component {
 					y: 0,
 				},
 			},
+			cableConnections: [
+				["3/outletPin/x", "2/inletPin"],
+				["1/outletPin/1", "3/inletPin"],
+			],
 		};
 
 		console.info(stateSchema.validate(initialState));
@@ -126,6 +136,8 @@ class App extends React.Component {
 		this.startCableDrag = this.startCableDrag.bind(this);
 		this.calcCableContainerPos = this.calcCableContainerPos.bind(this);
 		this.calcCableLine = this.calcCableLine.bind(this);
+		this.addCableConnection = this.addCableConnection.bind(this);
+		this.getPinPosition = this.getPinPosition.bind(this);
 	}
 
 	componentDidMount() {
@@ -134,6 +146,7 @@ class App extends React.Component {
 				produce(curState, (draftState) => {
 					draftState.nodePinnedId = null;
 					draftState.cableDrag.isDragging = false;
+					draftState.cableDrag.origin = null;
 				})
 			)
 		);
@@ -293,12 +306,13 @@ class App extends React.Component {
 		);
 	}
 
-	startCableDrag(e) {
+	startCableDrag(e, origin) {
 		e.stopPropagation();
 		console.log(e);
 		this.setState({
 			cableDrag: {
 				isDragging: true,
+				origin: origin,
 				initialPos: {
 					x: e.clientX,
 					y: e.clientY,
@@ -335,6 +349,68 @@ class App extends React.Component {
 				break;
 			default:
 				break;
+		}
+	}
+
+	addCableConnection(target) {
+		const originType =
+			(this.state.cableDrag.origin.match(/\//g) || []).length === 1
+				? "inlet"
+				: "outlet";
+		const targetType =
+			(target.match(/\//g) || []).length === 1 ? "inlet" : "outlet";
+		if (originType === "inlet" && targetType === "outlet") {
+			this.setState((curState) =>
+				produce(curState, (draftState) => {
+					draftState.cableConnections.push([
+						target,
+						this.state.cableDrag.origin
+					]);
+				})
+			);
+		} else if (originType === "outlet" && targetType === "inlet") {
+			this.setState((curState) =>
+				produce(curState, (draftState) => {
+					draftState.cableConnections.push([
+						this.state.cableDrag.origin,
+						target,
+					]);
+				})
+			);
+		}
+	}
+
+	getPinPosition(pin) {
+		const type = (pin.match(/\//g) || []).length === 1 ? "inlet" : "outlet";
+		//console.log("type:", type, pin);
+		if (type === "inlet") {
+			const [nodeId, ,] = pin.split("/");
+			const node = this.state.nodes.find((n) => n.id === nodeId);
+			const pinOffset = 15;
+			const position = {
+				x: node.nodePos.x - pinOffset + 5,
+				y: node.nodePos.y + 150 / 2 + 5,
+			};
+			//console.log(position);
+			return position;
+		} else if (type === "outlet") {
+			const [nodeId, , outletPinName] = pin.split("/");
+			//console.log(nodeId, outletPinName);
+			const node = this.state.nodes.find((n) => n.id === nodeId);
+			const nodeBoxWidth = 200;
+			const pinOffset = 15;
+			// (node.outletPinNames.indexOf(outletPinName) + 1) *
+			// 	(150 / (node.outletPinNames.length + 1)) -
+			// 	5;
+			const position = {
+				x: node.nodePos.x + nodeBoxWidth + pinOffset - 5,
+				y:
+					node.nodePos.y +
+					(node.outletPinNames.indexOf(outletPinName) + 1) *
+						(150 / (node.outletPinNames.length + 1)),
+			};
+			//console.log(position);
+			return position;
 		}
 	}
 
@@ -395,6 +471,58 @@ class App extends React.Component {
 							Sorry, your browser does not support inline SVG.
 						</svg>
 					) : null}
+					{this.state.cableConnections.map((cC) => {
+						// the initial/end positions might be reversed,
+						//   but it seems that theres a slight improvement in performance this way
+						const initialPosition = this.getPinPosition(cC[1]);
+						const endPosition = this.getPinPosition(cC[0]);
+						return (
+							<svg
+								height={Math.abs(
+									endPosition.y - initialPosition.y
+								)}
+								width={Math.abs(
+									endPosition.x - initialPosition.x
+								)}
+								style={{
+									position: "absolute",
+									...this.calcCableContainerPos(
+										endPosition,
+										initialPosition
+									),
+									backgroundColor: "rgb(0, 255, 0, 0.1)",
+								}}
+							>
+								<line
+									x1={this.calcCableLine(
+										"x1",
+										initialPosition,
+										endPosition
+									)}
+									y1={this.calcCableLine(
+										"y1",
+										initialPosition,
+										endPosition
+									)}
+									x2={this.calcCableLine(
+										"x2",
+										initialPosition,
+										endPosition
+									)}
+									y2={this.calcCableLine(
+										"y2",
+										initialPosition,
+										endPosition
+									)}
+									style={{
+										stroke: "rgb(255,0,0)",
+										strokeWidth: "2",
+									}}
+								/>
+								Sorry, your browser does not support inline SVG.
+							</svg>
+						);
+					})}
 					{this.state.nodes.map((n) => (
 						<div
 							id={n.id}
@@ -414,7 +542,13 @@ class App extends React.Component {
 							<div className="body"></div>
 							<div
 								className="node-box__inlet-pin"
-								onMouseDown={(e) => this.startCableDrag(e)}
+								title="inlet pin"
+								onMouseDown={(e) =>
+									this.startCableDrag(e, `${n.id}/inletPin`)
+								}
+								onMouseUp={(e) =>
+									this.addCableConnection(`${n.id}/inletPin`)
+								}
 							></div>
 							{n.outletPinNames.map((pinName, i) => (
 								<div
@@ -429,6 +563,17 @@ class App extends React.Component {
 											"px",
 									}}
 									title={pinName}
+									onMouseDown={(e) =>
+										this.startCableDrag(
+											e,
+											`${n.id}/outletPin/${pinName}`
+										)
+									}
+									onMouseUp={(e) =>
+										this.addCableConnection(
+											`${n.id}/outletPin/${pinName}`
+										)
+									}
 								></div>
 							))}
 						</div>
