@@ -88,16 +88,34 @@ button i {
 	background-color: #ddd;
 }
 
-.input-group {
+.settings-group {
 	width: 100%;
 	padding: 10px;
 }
-.input-label {
+
+.settings-group__id-input-label {
 	width: 100%;
 	margin-bottom: 0px;
 }
-.input-field {
+.settings-group__id-input-field {
 	width: 100%;
+}
+
+.settings-group__outlet-pins-label {
+	width: 100%;
+	margin-bottom: 0px;
+}
+.settings-group__outlet-pin-name-input-field {
+	width: 200px;
+	margin-right: 5px;
+}
+.settings-group__outlet-pin-delete-button {
+	width: 70px;
+}
+.settings-group__outlet-pin-add-button {
+	display: block;
+	margin: 0 auto;
+	margin-top: 5px;
 }
 
 .box {
@@ -144,7 +162,7 @@ button i {
 	height: 10px;
 	background-color: black;
 	right: -15px;
-	top: 72px;
+	/* top: 72px; */
 }
 .start-node-box__inlet-pin {
 	position: absolute;
