@@ -14,6 +14,17 @@ import "./App.css";
 // Display an error if there two nodes with the same if
 // Display an error if there are two outlet pins with the same name within a node
 // Implement a method that calculates pin positions
+// When a pin gets deleted, also remove it's associated cable connections
+// Find a better way to continue propagation to the header (parent) element
+// Add node title for display instead of id
+// Implement request tracer view
+// Implement sidebar inspector resizing
+// Implement data bags
+// Try adding a "virtual" dot that will expand the patch space
+//     (moved with those arrows at the bottom right of the patch space)
+// Split the application into logical encapsulated components
+/*###########################################################################################*/
+// When changing node id: update every occurrence of that node id in the cable connections array
 
 class App extends React.Component {
 	constructor(props) {
@@ -31,6 +42,10 @@ class App extends React.Component {
 				.items(
 					Joi.object({
 						id: Joi.string().required(),
+						reqMethod: Joi.string()
+							.valid("GET", "POST", "DELETE", "CONNECT")
+							.required(),
+						url: Joi.string().required(),
 						nodePos: Joi.object({
 							x: Joi.number().required(),
 							y: Joi.number().required(),
@@ -62,6 +77,9 @@ class App extends React.Component {
 			cableConnections: Joi.array()
 				.items(Joi.array().items(Joi.string()).length(2))
 				.required(),
+			bottomPanelIsDragging: Joi.bool().required(),
+			bottomPanelMouseLastPositionY: Joi.number().required(),
+			bottomPanelHeight: Joi.number().required(),
 		});
 
 		const initialState = {
@@ -74,6 +92,8 @@ class App extends React.Component {
 			nodes: [
 				{
 					id: "1",
+					reqMethod: "GET",
+					url: "https://www.google.com/",
 					nodePos: {
 						x: 0,
 						y: 0,
@@ -82,6 +102,8 @@ class App extends React.Component {
 				},
 				{
 					id: "2",
+					reqMethod: "POST",
+					url: "https://en.wikipedia.org/",
 					nodePos: {
 						x: 250,
 						y: 0,
@@ -90,6 +112,8 @@ class App extends React.Component {
 				},
 				{
 					id: "3",
+					reqMethod: "GET",
+					url: "https://www.youtube.com/",
 					nodePos: {
 						x: 250,
 						y: 200,
@@ -119,17 +143,24 @@ class App extends React.Component {
 				["3/outletPin/x", "2/inletPin"],
 				["1/outletPin/1", "3/inletPin"],
 			],
+			bottomPanelIsDragging: false,
+			bottomPanelMouseLastPositionY: 0,
+			bottomPanelHeight: 100,
 		};
 
 		console.info(stateSchema.validate(initialState));
 
 		this.state = initialState;
 
-		this.startDrag = this.startDrag.bind(this);
+		this.startNodeDrag = this.startNodeDrag.bind(this);
 		this.handlePatchSpaceClick = this.handlePatchSpaceClick.bind(this);
 		this.addNode = this.addNode.bind(this);
 		this.inspectNode = this.inspectNode.bind(this);
 		this.updateInspectedNodeId = this.updateInspectedNodeId.bind(this);
+		this.updateInspectedNodeReqMethod = this.updateInspectedNodeReqMethod.bind(
+			this
+		);
+		this.updateInspectedNodeUrl = this.updateInspectedNodeUrl.bind(this);
 		this.updateInspectedNodeOutletPinName = this.updateInspectedNodeOutletPinName.bind(
 			this
 		);
@@ -138,6 +169,7 @@ class App extends React.Component {
 		this.calcCableLine = this.calcCableLine.bind(this);
 		this.addCableConnection = this.addCableConnection.bind(this);
 		this.getPinPosition = this.getPinPosition.bind(this);
+		this.startBottomPanelDrag = this.startBottomPanelDrag.bind(this);
 	}
 
 	componentDidMount() {
@@ -147,6 +179,7 @@ class App extends React.Component {
 					draftState.nodePinnedId = null;
 					draftState.cableDrag.isDragging = false;
 					draftState.cableDrag.origin = null;
+					draftState.bottomPanelIsDragging = false;
 				})
 			)
 		);
@@ -194,6 +227,18 @@ class App extends React.Component {
 					})
 				);
 			}
+
+			if (this.state.bottomPanelIsDragging) {
+				const mousePos = this.getMousePos(e);
+
+				this.setState((curState) =>
+					produce(curState, (draftState) => {
+						draftState.bottomPanelHeight +=
+							curState.bottomPanelMouseLastPositionY - mousePos.y;
+						draftState.bottomPanelMouseLastPositionY = mousePos.y;
+					})
+				);
+			}
 		});
 	}
 
@@ -204,11 +249,12 @@ class App extends React.Component {
 		};
 	}
 
-	startDrag(e, id) {
+	startNodeDrag(e, id) {
+		console.log("DRAG:", e, id);
 		// console.log(this.state.nodePinnedId, e.target.getClientRects()[0]);
 		const mousePos = this.getMousePos(e);
 		const offset = e.target.getClientRects()[0];
-		console.log(mousePos, offset);
+		console.log(mousePos, offset.top);
 		this.setState({
 			nodePinnedId: id,
 			initialNodeDragOffset: {
@@ -264,6 +310,40 @@ class App extends React.Component {
 				draftState.nodes.find(
 					(n) => n.id === curState.nodeInspectedId
 				).id = e.target.value;
+				// Update every occurrence of the old node id in the cable connections array
+				//   with the new node id
+				draftState.cableConnections.forEach(function (cC, i) {
+					if (cC[0].split("/")[0] === curState.nodeInspectedId) {
+						const pinPathArr = this[i][0].split("/");
+						pinPathArr[0] = draftState.nodeInspectedId;
+						this[i][0] = pinPathArr.join("/");
+					}
+					if (cC[1].split("/")[0] === curState.nodeInspectedId) {
+						const pinPathArr = this[i][1].split("/");
+						pinPathArr[0] = draftState.nodeInspectedId;
+						this[i][1] = pinPathArr.join("/");
+					}
+				}, draftState.cableConnections);
+			})
+		);
+	}
+
+	updateInspectedNodeReqMethod(e) {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.nodes.find(
+					(n) => n.id === draftState.nodeInspectedId
+				).reqMethod = e.target.value;
+			})
+		);
+	}
+
+	updateInspectedNodeUrl(e) {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.nodes.find(
+					(n) => n.id === draftState.nodeInspectedId
+				).url = e.target.value;
 			})
 		);
 		console.log(e.target.value);
@@ -359,22 +439,25 @@ class App extends React.Component {
 				: "outlet";
 		const targetType =
 			(target.match(/\//g) || []).length === 1 ? "inlet" : "outlet";
+
+		let newCableConnection;
 		if (originType === "inlet" && targetType === "outlet") {
-			this.setState((curState) =>
-				produce(curState, (draftState) => {
-					draftState.cableConnections.push([
-						target,
-						this.state.cableDrag.origin
-					]);
-				})
-			);
+			newCableConnection = [target, this.state.cableDrag.origin];
 		} else if (originType === "outlet" && targetType === "inlet") {
+			newCableConnection = [this.state.cableDrag.origin, target];
+		}
+
+		if (
+			newCableConnection &&
+			!this.state.cableConnections.some(
+				(cC) =>
+					JSON.stringify(cC) === JSON.stringify(newCableConnection)
+			)
+		) {
+			console.log("pass", newCableConnection);
 			this.setState((curState) =>
 				produce(curState, (draftState) => {
-					draftState.cableConnections.push([
-						this.state.cableDrag.origin,
-						target,
-					]);
+					draftState.cableConnections.push(newCableConnection);
 				})
 			);
 		}
@@ -414,11 +497,23 @@ class App extends React.Component {
 		}
 	}
 
+	startBottomPanelDrag(e) {
+		// console.log(this.state.nodePinnedId, e.target.getClientRects()[0]);
+		const mousePos = this.getMousePos(e);
+		this.setState({
+			bottomPanelIsDragging: true,
+			bottomPanelMouseLastPositionY: mousePos.y,
+		});
+	}
+
 	render() {
 		return (
 			<div className="main-container">
 				<div
 					className="patch-space"
+					style={{
+						height: `calc(100% - ${this.state.bottomPanelHeight}px)`,
+					}}
 					onMouseDown={() => this.handlePatchSpaceClick()}
 					onContextMenu={(e) => this.addNode(e)}
 				>
@@ -535,9 +630,20 @@ class App extends React.Component {
 						>
 							<div
 								className="header"
-								onMouseDown={(e) => this.startDrag(e, n.id)}
+								onMouseDown={(e) => this.startNodeDrag(e, n.id)}
 							>
-								{n.id}
+								<div className="header__id-display-box">
+									{n.id}
+								</div>
+								<div className="header__request-method-display-box">
+									{n.reqMethod}
+								</div>
+								<div
+									className="header__url-display-box"
+									title={n.url}
+								>
+									{n.url}
+								</div>
 							</div>
 							<div className="body"></div>
 							<div
@@ -587,8 +693,8 @@ class App extends React.Component {
 						}}
 					>
 						<div
-							className="header"
-							onMouseDown={(e) => this.startDrag(e, "start")}
+							className="start-node-header"
+							onMouseDown={(e) => this.startNodeDrag(e, "start")}
 						>
 							start
 						</div>
@@ -609,7 +715,12 @@ class App extends React.Component {
 						></i>
 					</button>
 				</div>
-				<div className="sidebar-inspector">
+				<div
+					className="sidebar-inspector"
+					style={{
+						height: `calc(100% - ${this.state.bottomPanelHeight}px)`,
+					}}
+				>
 					{this.state.nodeInspectedId !== null ? (
 						<div>
 							<div className="settings-group">
@@ -622,6 +733,42 @@ class App extends React.Component {
 									value={this.state.nodeInspectedId}
 									onChange={(e) =>
 										this.updateInspectedNodeId(e)
+									}
+								/>
+							</div>
+							<hr style={{ margin: "0" }} />
+							<div className="settings-group">
+								<div className="settings-group__request-label">
+									Request:
+								</div>
+								<select
+									className="settings-group__request-method-select"
+									value={
+										this.state.nodes.find(
+											(n) =>
+												n.id ===
+												this.state.nodeInspectedId
+										).reqMethod
+									}
+									onChange={this.updateInspectedNodeReqMethod}
+								>
+									<option value="GET">GET</option>
+									<option value="POST">POST</option>
+									<option value="DELETE">DELETE</option>
+									<option value="CONNECT">CONNECT</option>
+								</select>
+								<input
+									type="text"
+									className="settings-group__url-input-field"
+									value={
+										this.state.nodes.find(
+											(n) =>
+												n.id ===
+												this.state.nodeInspectedId
+										).url
+									}
+									onChange={(e) =>
+										this.updateInspectedNodeUrl(e)
 									}
 								/>
 							</div>
@@ -671,6 +818,17 @@ class App extends React.Component {
 							</div>
 						</div>
 					) : null}
+				</div>
+				<div
+					className="bottom-panel"
+					style={{ height: this.state.bottomPanelHeight + "px" }}
+				>
+					<div
+						className="bottom-panel__drag"
+						onMouseDown={(e) => {
+							this.startBottomPanelDrag(e);
+						}}
+					></div>
 				</div>
 			</div>
 		);
