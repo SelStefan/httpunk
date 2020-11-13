@@ -18,12 +18,14 @@ import "./App.css";
 // Find a better way to continue propagation to the header (parent) element
 // Add node title for display instead of id
 // Implement request tracer view
-// Implement sidebar inspector resizing
 // Implement data bags
 // Try adding a "virtual" dot that will expand the patch space
 //     (moved with those arrows at the bottom right of the patch space)
 // Split the application into logical encapsulated components
+// Implement a "toolbar playback" like feature for running rails
 /*###########################################################################################*/
+// rename sidebar inspector -> sidebar panel
+// Implement sidebar inspector resizing
 // When changing node id: update every occurrence of that node id in the cable connections array
 
 class App extends React.Component {
@@ -77,9 +79,19 @@ class App extends React.Component {
 			cableConnections: Joi.array()
 				.items(Joi.array().items(Joi.string()).length(2))
 				.required(),
-			bottomPanelIsDragging: Joi.bool().required(),
-			bottomPanelMouseLastPositionY: Joi.number().required(),
-			bottomPanelHeight: Joi.number().required(),
+			sidebarPanel: Joi.object({
+				isDragging: Joi.bool().required(),
+				mouseDragLastPositionX: Joi.number().required(),
+				width: Joi.number().required(),
+			}).required(),
+			bottomPanel: Joi.object({
+				isDragging: Joi.bool().required(),
+				mouseDragLastPositionY: Joi.number().required(),
+				height: Joi.number().required(),
+				activeTab: Joi.string()
+					.valid("REQUEST_TRACER", "SCRIPTS", "DATA_BAGS")
+					.required(),
+			}).required(),
 		});
 
 		const initialState = {
@@ -143,9 +155,17 @@ class App extends React.Component {
 				["3/outletPin/x", "2/inletPin"],
 				["1/outletPin/1", "3/inletPin"],
 			],
-			bottomPanelIsDragging: false,
-			bottomPanelMouseLastPositionY: 0,
-			bottomPanelHeight: 100,
+			sidebarPanel: {
+				isDragging: false,
+				mouseDragLastPositionX: 0,
+				width: 300,
+			},
+			bottomPanel: {
+				isDragging: false,
+				mouseDragLastPositionY: 0,
+				height: 100,
+				activeTab: "REQUEST_TRACER",
+			},
 		};
 
 		console.info(stateSchema.validate(initialState));
@@ -169,7 +189,9 @@ class App extends React.Component {
 		this.calcCableLine = this.calcCableLine.bind(this);
 		this.addCableConnection = this.addCableConnection.bind(this);
 		this.getPinPosition = this.getPinPosition.bind(this);
+		this.startSidebarPanelDrag = this.startSidebarPanelDrag.bind(this);
 		this.startBottomPanelDrag = this.startBottomPanelDrag.bind(this);
+		this.setActiveBottomPanelTab = this.setActiveBottomPanelTab.bind(this);
 	}
 
 	componentDidMount() {
@@ -179,7 +201,8 @@ class App extends React.Component {
 					draftState.nodePinnedId = null;
 					draftState.cableDrag.isDragging = false;
 					draftState.cableDrag.origin = null;
-					draftState.bottomPanelIsDragging = false;
+					draftState.sidebarPanel.isDragging = false;
+					draftState.bottomPanel.isDragging = false;
 				})
 			)
 		);
@@ -228,14 +251,30 @@ class App extends React.Component {
 				);
 			}
 
-			if (this.state.bottomPanelIsDragging) {
+			if (this.state.sidebarPanel.isDragging) {
 				const mousePos = this.getMousePos(e);
 
 				this.setState((curState) =>
 					produce(curState, (draftState) => {
-						draftState.bottomPanelHeight +=
-							curState.bottomPanelMouseLastPositionY - mousePos.y;
-						draftState.bottomPanelMouseLastPositionY = mousePos.y;
+						draftState.sidebarPanel.width +=
+							curState.sidebarPanel.mouseDragLastPositionX -
+							mousePos.x;
+						draftState.sidebarPanel.mouseDragLastPositionX =
+							mousePos.x;
+					})
+				);
+			}
+
+			if (this.state.bottomPanel.isDragging) {
+				const mousePos = this.getMousePos(e);
+
+				this.setState((curState) =>
+					produce(curState, (draftState) => {
+						draftState.bottomPanel.height +=
+							curState.bottomPanel.mouseDragLastPositionY -
+							mousePos.y;
+						draftState.bottomPanel.mouseDragLastPositionY =
+							mousePos.y;
 					})
 				);
 			}
@@ -497,13 +536,34 @@ class App extends React.Component {
 		}
 	}
 
+	startSidebarPanelDrag(e) {
+		// console.log(this.state.nodePinnedId, e.target.getClientRects()[0]);
+		const mousePos = this.getMousePos(e);
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.sidebarPanel.isDragging = true;
+				draftState.sidebarPanel.mouseDragLastPositionX = mousePos.x;
+			})
+		);
+	}
+
 	startBottomPanelDrag(e) {
 		// console.log(this.state.nodePinnedId, e.target.getClientRects()[0]);
 		const mousePos = this.getMousePos(e);
-		this.setState({
-			bottomPanelIsDragging: true,
-			bottomPanelMouseLastPositionY: mousePos.y,
-		});
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.bottomPanel.isDragging = true;
+				draftState.bottomPanel.mouseDragLastPositionY = mousePos.y;
+			})
+		);
+	}
+
+	setActiveBottomPanelTab(tabName) {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.bottomPanel.activeTab = tabName;
+			})
+		);
 	}
 
 	render() {
@@ -512,7 +572,8 @@ class App extends React.Component {
 				<div
 					className="patch-space"
 					style={{
-						height: `calc(100% - ${this.state.bottomPanelHeight}px)`,
+						width: `calc(100% - ${this.state.sidebarPanel.width}px)`,
+						height: `calc(100% - ${this.state.bottomPanel.height}px)`,
 					}}
 					onMouseDown={() => this.handlePatchSpaceClick()}
 					onContextMenu={(e) => this.addNode(e)}
@@ -716,11 +777,19 @@ class App extends React.Component {
 					</button>
 				</div>
 				<div
-					className="sidebar-inspector"
+					className="sidebar-panel"
 					style={{
-						height: `calc(100% - ${this.state.bottomPanelHeight}px)`,
+						width: this.state.sidebarPanel.width + "px",
+						height: `calc(100% - ${this.state.bottomPanel.height}px)`,
+					}}
+					onMouseDown={(e) => {
+						this.startSidebarPanelDrag(e);
 					}}
 				>
+					<div
+						className="sidebar-panel__drag"
+						onMouseDown={(e) => {}}
+					></div>
 					{this.state.nodeInspectedId !== null ? (
 						<div>
 							<div className="settings-group">
@@ -821,7 +890,7 @@ class App extends React.Component {
 				</div>
 				<div
 					className="bottom-panel"
-					style={{ height: this.state.bottomPanelHeight + "px" }}
+					style={{ height: this.state.bottomPanel.height + "px" }}
 				>
 					<div
 						className="bottom-panel__drag"
@@ -829,6 +898,45 @@ class App extends React.Component {
 							this.startBottomPanelDrag(e);
 						}}
 					></div>
+					<div className="bottom-panel__tabs-header">
+						<button
+							onClick={() =>
+								this.setActiveBottomPanelTab("REQUEST_TRACER")
+							}
+						>
+							Request Tracer
+						</button>
+						<button
+							onClick={() =>
+								this.setActiveBottomPanelTab("SCRIPTS")
+							}
+						>
+							Scripts
+						</button>
+						<button
+							onClick={() =>
+								this.setActiveBottomPanelTab("DATA_BAGS")
+							}
+						>
+							Data Bags
+						</button>
+					</div>
+					{(() => {
+						if (
+							this.state.bottomPanel.activeTab ===
+							"REQUEST_TRACER"
+						) {
+							return <div>Request Tracer</div>;
+						} else if (
+							this.state.bottomPanel.activeTab === "SCRIPTS"
+						) {
+							return <div>Scripts</div>;
+						} else if (
+							this.state.bottomPanel.activeTab === "DATA_BAGS"
+						) {
+							return <div>Data Bags</div>;
+						}
+					})()}
 				</div>
 			</div>
 		);
