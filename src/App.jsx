@@ -23,6 +23,9 @@ import "./App.css";
 //     (moved with those arrows at the bottom right of the patch space)
 // Split the application into logical encapsulated components
 // Implement a "toolbar playback" like feature for running rails
+// address the potential problem with using float: right on the params remove button
+// read more on this binding for methods, since it's a bit confusing
+// update body content to support different content types (for now it's just JSON)
 /*###########################################################################################*/
 // rename sidebar inspector -> sidebar panel
 // Implement sidebar inspector resizing
@@ -44,10 +47,26 @@ class App extends React.Component {
 				.items(
 					Joi.object({
 						id: Joi.string().required(),
-						reqMethod: Joi.string()
-							.valid("GET", "POST", "DELETE", "CONNECT")
-							.required(),
-						url: Joi.string().required(),
+						reqSettings: Joi.object({
+							isCollapsed: Joi.bool().required(),
+							method: Joi.string()
+								.valid("GET", "POST", "DELETE", "CONNECT")
+								.required(),
+							url: Joi.string().required(),
+							activeTab: Joi.string()
+								.valid("PARAMS", "AUTH", "HEADERS", "BODY")
+								.required(),
+							params: Joi.array()
+								.items(
+									Joi.object({
+										key: Joi.string().required(),
+										value: Joi.string().required(),
+										isEnabled: Joi.bool().required(),
+									})
+								)
+								.required(),
+							bodyContent: Joi.string().required(),
+						}).required(),
 						nodePos: Joi.object({
 							x: Joi.number().required(),
 							y: Joi.number().required(),
@@ -104,8 +123,20 @@ class App extends React.Component {
 			nodes: [
 				{
 					id: "1",
-					reqMethod: "GET",
-					url: "https://www.google.com/",
+					reqSettings: {
+						isCollapsed: false,
+						method: "GET",
+						url: "https://www.google.com/",
+						activeTab: "PARAMS",
+						params: [
+							{
+								key: "a",
+								value: "1",
+								isEnabled: true,
+							},
+						],
+						bodyContent: "{a: 1}",
+					},
 					nodePos: {
 						x: 0,
 						y: 0,
@@ -114,8 +145,20 @@ class App extends React.Component {
 				},
 				{
 					id: "2",
-					reqMethod: "POST",
-					url: "https://en.wikipedia.org/",
+					reqSettings: {
+						isCollapsed: false,
+						method: "POST",
+						url: "https://en.wikipedia.org/",
+						activeTab: "PARAMS",
+						params: [
+							{
+								key: "b",
+								value: "2",
+								isEnabled: false,
+							},
+						],
+						bodyContent: "{b: 2}",
+					},
 					nodePos: {
 						x: 250,
 						y: 0,
@@ -124,8 +167,20 @@ class App extends React.Component {
 				},
 				{
 					id: "3",
-					reqMethod: "GET",
-					url: "https://www.youtube.com/",
+					reqSettings: {
+						isCollapsed: false,
+						method: "GET",
+						url: "https://www.youtube.com/",
+						activeTab: "PARAMS",
+						params: [
+							{
+								key: "c",
+								value: "3",
+								isEnabled: true,
+							},
+						],
+						bodyContent: "{c: 3}",
+					},
 					nodePos: {
 						x: 250,
 						y: 200,
@@ -177,10 +232,30 @@ class App extends React.Component {
 		this.addNode = this.addNode.bind(this);
 		this.inspectNode = this.inspectNode.bind(this);
 		this.updateInspectedNodeId = this.updateInspectedNodeId.bind(this);
+		this.toggleInspectedNodeReqSettingsIsCollapsed = this.toggleInspectedNodeReqSettingsIsCollapsed.bind(
+			this
+		);
 		this.updateInspectedNodeReqMethod = this.updateInspectedNodeReqMethod.bind(
 			this
 		);
 		this.updateInspectedNodeUrl = this.updateInspectedNodeUrl.bind(this);
+		this.updateInspectedNodeReqSettingsActiveTab = this.updateInspectedNodeReqSettingsActiveTab.bind(
+			this
+		);
+		this.addInspectedNodeParam = this.addInspectedNodeParam.bind(this);
+		this.removeInspectedNodeParam = this.removeInspectedNodeParam.bind(
+			this
+		);
+		this.updateInspectedNodeParamKey = this.updateInspectedNodeParamKey.bind(
+			this
+		);
+		this.updateInspectedNodeParamValue = this.updateInspectedNodeParamValue.bind(
+			this
+		);
+		this.toggleInspectedNodeParam = this.toggleInspectedNodeParam.bind(
+			this
+		);
+		this.updateInspectedNodeBodyContent = this.updateInspectedNodeBodyContent.bind(this);
 		this.updateInspectedNodeOutletPinName = this.updateInspectedNodeOutletPinName.bind(
 			this
 		);
@@ -191,7 +266,10 @@ class App extends React.Component {
 		this.getPinPosition = this.getPinPosition.bind(this);
 		this.startSidebarPanelDrag = this.startSidebarPanelDrag.bind(this);
 		this.startBottomPanelDrag = this.startBottomPanelDrag.bind(this);
-		this.setActiveBottomPanelTab = this.setActiveBottomPanelTab.bind(this);
+		this.setBottomPanelActiveTab = this.setBottomPanelActiveTab.bind(this);
+
+		//////// Util ////////////
+		this.getInspectedNode = this.getInspectedNode.bind(this);
 	}
 
 	componentDidMount() {
@@ -367,12 +445,24 @@ class App extends React.Component {
 		);
 	}
 
+	toggleInspectedNodeReqSettingsIsCollapsed() {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				const inspectedNode = draftState.nodes.find(
+					(n) => n.id === draftState.nodeInspectedId
+				);
+				inspectedNode.reqSettings.isCollapsed = !inspectedNode
+					.reqSettings.isCollapsed;
+			})
+		);
+	}
+
 	updateInspectedNodeReqMethod(e) {
 		this.setState((curState) =>
 			produce(curState, (draftState) => {
 				draftState.nodes.find(
 					(n) => n.id === draftState.nodeInspectedId
-				).reqMethod = e.target.value;
+				).reqSettings.method = e.target.value;
 			})
 		);
 	}
@@ -382,10 +472,82 @@ class App extends React.Component {
 			produce(curState, (draftState) => {
 				draftState.nodes.find(
 					(n) => n.id === draftState.nodeInspectedId
-				).url = e.target.value;
+				).reqSettings.url = e.target.value;
 			})
 		);
 		console.log(e.target.value);
+	}
+
+	updateInspectedNodeReqSettingsActiveTab(tabName) {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.nodes.find(
+					(n) => n.id === draftState.nodeInspectedId
+				).reqSettings.activeTab = tabName;
+			})
+		);
+	}
+
+	addInspectedNodeParam() {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.nodes
+					.find((n) => n.id === draftState.nodeInspectedId)
+					.reqSettings.params.push({
+						key: "",
+						value: "",
+						isEnabled: true,
+					});
+			})
+		);
+	}
+	removeInspectedNodeParam(i) {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.nodes
+					.find((n) => n.id === draftState.nodeInspectedId)
+					.reqSettings.params.splice(i, 1);
+			})
+		);
+	}
+	updateInspectedNodeParamKey(i, e) {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.nodes.find(
+					(n) => n.id === draftState.nodeInspectedId
+				).reqSettings.params[i].key = e.target.value;
+			})
+		);
+	}
+	updateInspectedNodeParamValue(i, e) {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.nodes.find(
+					(n) => n.id === draftState.nodeInspectedId
+				).reqSettings.params[i].value = e.target.value;
+			})
+		);
+	}
+	toggleInspectedNodeParam(i) {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				const inspectedNode = draftState.nodes.find(
+					(n) => n.id === draftState.nodeInspectedId
+				);
+				inspectedNode.reqSettings.params[i].isEnabled = !inspectedNode
+					.reqSettings.params[i].isEnabled;
+			})
+		);
+	}
+
+	updateInspectedNodeBodyContent(e) {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.nodes.find(
+					(n) => n.id === draftState.nodeInspectedId
+				).reqSettings.bodyContent = e.target.value;
+			})
+		);
 	}
 
 	updateInspectedNodeOutletPinName(i, e) {
@@ -558,12 +720,40 @@ class App extends React.Component {
 		);
 	}
 
-	setActiveBottomPanelTab(tabName) {
+	setBottomPanelActiveTab(tabName) {
 		this.setState((curState) =>
 			produce(curState, (draftState) => {
 				draftState.bottomPanel.activeTab = tabName;
 			})
 		);
+	}
+
+	//////// Util ////////////
+
+	getInspectedNode() {
+		return this.state.nodes.find(
+			(n) => n.id === this.state.nodeInspectedId
+		);
+	}
+
+	appendParamsToUrl(url, params) {
+		// Extracts the url root
+		url =
+			url.indexOf("?") === -1 ? url : url.substring(0, url.indexOf("?"));
+		let numOfParamsAppended = 0;
+		params.forEach((p, i) => {
+			if (numOfParamsAppended > 0) {
+				url = url + "&";
+			}
+			if (p.isEnabled) {
+				if (numOfParamsAppended === 0) {
+					url = url + "?";
+				}
+				url = url + `${p.key}=${p.value}`;
+				numOfParamsAppended++;
+			}
+		});
+		return url;
 	}
 
 	render() {
@@ -697,13 +887,19 @@ class App extends React.Component {
 									{n.id}
 								</div>
 								<div className="header__request-method-display-box">
-									{n.reqMethod}
+									{n.reqSettings.method}
 								</div>
 								<div
 									className="header__url-display-box"
-									title={n.url}
+									title={this.appendParamsToUrl(
+										n.reqSettings.url,
+										n.reqSettings.params
+									)}
 								>
-									{n.url}
+									{this.appendParamsToUrl(
+										n.reqSettings.url,
+										n.reqSettings.params
+									)}
 								</div>
 							</div>
 							<div className="body"></div>
@@ -782,23 +978,20 @@ class App extends React.Component {
 						width: this.state.sidebarPanel.width + "px",
 						height: `calc(100% - ${this.state.bottomPanel.height}px)`,
 					}}
-					onMouseDown={(e) => {
-						this.startSidebarPanelDrag(e);
-					}}
 				>
 					<div
 						className="sidebar-panel__drag"
-						onMouseDown={(e) => {}}
+						onMouseDown={(e) => {
+							this.startSidebarPanelDrag(e);
+						}}
 					></div>
 					{this.state.nodeInspectedId !== null ? (
 						<div>
-							<div className="settings-group">
-								<div className="settings-group__id-input-label">
-									Id:
-								</div>
+							<div className="node-id">
+								<div className="node-id__label">Id:</div>
 								<input
 									type="text"
-									className="settings-group__id-input-field"
+									className="node-id__input-field"
 									value={this.state.nodeInspectedId}
 									onChange={(e) =>
 										this.updateInspectedNodeId(e)
@@ -806,52 +999,273 @@ class App extends React.Component {
 								/>
 							</div>
 							<hr style={{ margin: "0" }} />
-							<div className="settings-group">
-								<div className="settings-group__request-label">
-									Request:
-								</div>
-								<select
-									className="settings-group__request-method-select"
-									value={
-										this.state.nodes.find(
-											(n) =>
-												n.id ===
-												this.state.nodeInspectedId
-										).reqMethod
+							<div className="request-settings">
+								<div
+									className="request-settings__label"
+									onClick={
+										this
+											.toggleInspectedNodeReqSettingsIsCollapsed
 									}
-									onChange={this.updateInspectedNodeReqMethod}
 								>
-									<option value="GET">GET</option>
-									<option value="POST">POST</option>
-									<option value="DELETE">DELETE</option>
-									<option value="CONNECT">CONNECT</option>
-								</select>
-								<input
-									type="text"
-									className="settings-group__url-input-field"
-									value={
-										this.state.nodes.find(
-											(n) =>
-												n.id ===
-												this.state.nodeInspectedId
-										).url
-									}
-									onChange={(e) =>
-										this.updateInspectedNodeUrl(e)
-									}
-								/>
+									Request Settings:
+								</div>
+								{!this.getInspectedNode().reqSettings
+									.isCollapsed ? (
+									<div>
+										<div className="request-settings__url">
+											<select
+												className="request-settings__method-select"
+												value={
+													this.getInspectedNode()
+														.reqSettings.method
+												}
+												onChange={
+													this
+														.updateInspectedNodeReqMethod
+												}
+											>
+												<option value="GET">GET</option>
+												<option value="POST">
+													POST
+												</option>
+												<option value="DELETE">
+													DELETE
+												</option>
+												<option value="CONNECT">
+													CONNECT
+												</option>
+											</select>
+											<input
+												type="text"
+												className="request-settings__url-input-field"
+												value={this.appendParamsToUrl(
+													this.getInspectedNode()
+														.reqSettings.url,
+													this.getInspectedNode()
+														.reqSettings.params
+												)}
+												onChange={(e) =>
+													this.updateInspectedNodeUrl(
+														e
+													)
+												}
+											/>
+										</div>
+										<div className="request-settings__tabs">
+											<button
+												className={`request-settings__tab ${
+													this.getInspectedNode()
+														.reqSettings
+														.activeTab === "PARAMS"
+														? "request-settings__tab--active"
+														: null
+												}`}
+												onClick={() =>
+													this.updateInspectedNodeReqSettingsActiveTab(
+														"PARAMS"
+													)
+												}
+											>
+												Params
+											</button>
+											<button
+												className={`request-settings__tab ${
+													this.getInspectedNode()
+														.reqSettings
+														.activeTab === "AUTH"
+														? "request-settings__tab--active"
+														: null
+												}`}
+												onClick={() =>
+													this.updateInspectedNodeReqSettingsActiveTab(
+														"AUTH"
+													)
+												}
+											>
+												Auth
+											</button>
+											<button
+												className={`request-settings__tab ${
+													this.getInspectedNode()
+														.reqSettings
+														.activeTab === "HEADERS"
+														? "request-settings__tab--active"
+														: null
+												}`}
+												onClick={() =>
+													this.updateInspectedNodeReqSettingsActiveTab(
+														"HEADERS"
+													)
+												}
+											>
+												Headers
+											</button>
+											<button
+												className={`request-settings__tab ${
+													this.getInspectedNode()
+														.reqSettings
+														.activeTab === "BODY"
+														? "request-settings__tab--active"
+														: null
+												}`}
+												onClick={() =>
+													this.updateInspectedNodeReqSettingsActiveTab(
+														"BODY"
+													)
+												}
+											>
+												Body
+											</button>
+										</div>
+										{(() => {
+											if (
+												this.getInspectedNode()
+													.reqSettings.activeTab ===
+												"PARAMS"
+											) {
+												return (
+													<div className="request-settings__params">
+														{this.getInspectedNode().reqSettings.params.map(
+															(p, i) => (
+																<div>
+																	<input
+																		className="request-settings__params-key-field"
+																		type="text"
+																		placeholder="Add key"
+																		disabled={
+																			!p.isEnabled
+																		}
+																		value={
+																			p.key
+																		}
+																		onChange={(
+																			e
+																		) =>
+																			this.updateInspectedNodeParamKey(
+																				i,
+																				e
+																			)
+																		}
+																	/>
+																	<input
+																		className="request-settings__params-value-field"
+																		type="text"
+																		placeholder="Add value"
+																		disabled={
+																			!p.isEnabled
+																		}
+																		value={
+																			p.value
+																		}
+																		onChange={(
+																			e
+																		) =>
+																			this.updateInspectedNodeParamValue(
+																				i,
+																				e
+																			)
+																		}
+																	/>
+																	<button
+																		className="request-settings__params-toggle-button"
+																		onClick={() =>
+																			this.toggleInspectedNodeParam(
+																				i
+																			)
+																		}
+																	>
+																		{p.isEnabled
+																			? "Disable"
+																			: "Enable"}
+																	</button>
+																	<button
+																		className="request-settings__params-remove-button"
+																		onClick={() =>
+																			this.removeInspectedNodeParam(
+																				i
+																			)
+																		}
+																	>
+																		Remove
+																	</button>
+																</div>
+															)
+														)}
+														<input
+															className="request-settings__params-key-field"
+															type="text"
+															placeholder="Add key"
+															disabled
+														/>
+														<input
+															className="request-settings__params-value-field"
+															type="text"
+															placeholder="Add value"
+															disabled
+														/>
+														<button
+															className="request-settings__params-toggle-button"
+															onClick={
+																this
+																	.addInspectedNodeParam
+															}
+														>
+															Enable
+														</button>
+														<button
+															className="request-settings__params-remove-button"
+															disabled
+														>
+															Remove
+														</button>
+													</div>
+												);
+											} else if (
+												this.getInspectedNode()
+													.reqSettings.activeTab ===
+												"AUTH"
+											) {
+												return <div>Auth</div>;
+											} else if (
+												this.getInspectedNode()
+													.reqSettings.activeTab ===
+												"HEADERS"
+											) {
+												return <div>Headers</div>;
+											} else if (
+												this.getInspectedNode()
+													.reqSettings.activeTab ===
+												"BODY"
+											) {
+												return (
+													<div className="request-settings__body-container">
+														<textarea
+															className="request-settings__body"
+															value={
+																this.getInspectedNode()
+																	.reqSettings
+																	.bodyContent
+															}
+															onChange={(e) =>
+																this.updateInspectedNodeBodyContent(
+																	e
+																)
+															}
+														></textarea>
+													</div>
+												);
+											}
+										})()}
+									</div>
+								) : null}
 							</div>
 							<hr style={{ margin: "0" }} />
 							<div className="settings-group">
 								<div className="settings-group__outlet-pins-label">
 									Outlet pin names:
 								</div>
-								{this.state.nodes
-									.find(
-										(n) =>
-											n.id === this.state.nodeInspectedId
-									)
-									.outletPinNames.map((pinName, i) => (
+								{this.getInspectedNode().outletPinNames.map(
+									(pinName, i) => (
 										<div>
 											<input
 												type="text"
@@ -875,7 +1289,8 @@ class App extends React.Component {
 												Delete
 											</button>
 										</div>
-									))}
+									)
+								)}
 								<button
 									className="settings-group__outlet-pin-add-button"
 									onClick={() =>
@@ -901,21 +1316,21 @@ class App extends React.Component {
 					<div className="bottom-panel__tabs-header">
 						<button
 							onClick={() =>
-								this.setActiveBottomPanelTab("REQUEST_TRACER")
+								this.setBottomPanelActiveTab("REQUEST_TRACER")
 							}
 						>
 							Request Tracer
 						</button>
 						<button
 							onClick={() =>
-								this.setActiveBottomPanelTab("SCRIPTS")
+								this.setBottomPanelActiveTab("SCRIPTS")
 							}
 						>
 							Scripts
 						</button>
 						<button
 							onClick={() =>
-								this.setActiveBottomPanelTab("DATA_BAGS")
+								this.setBottomPanelActiveTab("DATA_BAGS")
 							}
 						>
 							Data Bags

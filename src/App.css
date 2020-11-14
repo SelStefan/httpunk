@@ -105,24 +105,115 @@ button i {
 	background-color: red;
 }
 
-/* END: Sidebar panel */
+.node-id {
+	width: 100%;
+	padding: 10px;
+}
+.node-id__label {
+	width: 100%;
+	margin-bottom: 0px;
+}
+.node-id__input-field {
+	width: 100%;
+}
+
+/*  */
+
+.request-settings-container {
+	width: 100%;
+	margin-bottom: 0px;
+}
+
+.request-settings-container__request-settings-label {
+	width: 100%;
+	margin-bottom: 0px;
+	margin-left: 10px;
+}
+
+.request-settings-container__settings-tabs {
+	width: 100%;
+	padding: 0 10px;
+}
+
+.request-settings {
+	width: 100%;
+	margin-bottom: 0px;
+}
+
+.request-settings__label {
+	width: 100%;
+	margin-bottom: 5px;
+	margin-left: 10px;
+}
+
+.request-settings__url {
+	width: 100%;
+	padding: 0px 10px 5px 10px;
+}
+
+.request-settings__method-select {
+	display: block;
+	margin-top: 3px;
+}
+
+.request-settings__url-input-field {
+	display: block;
+	width: 100%;
+	margin-top: 2px;
+}
+
+.request-settings__tabs {
+	width: 100%;
+	padding: 0 10px;
+}
+.request-settings__tab {
+
+}
+.request-settings__tab--active {
+	border-color: red;
+}
+
+.request-settings__params {
+	width: 100%;
+	padding: 0 10px;
+	margin: 2px 0 7px 0;
+}
+.request-settings__params-key-field {
+	width: 100%;
+}
+.request-settings__params-value-field {
+	width: 100%;
+}
+.request-settings__params-toggle-button {
+	width: 45%;
+	margin-top: 2px;
+}
+.request-settings__params-remove-button {
+	float: right;
+	width: 45%;
+	margin-top: 2px;
+}
+
+.request-settings__body-container {
+	width: 100%;
+	padding: 0 10px;
+	margin: 2px 0 7px 0;
+}
+.request-settings__body {
+	width: 100%;
+	height: 150px;
+}
+
+/*  */
 
 .settings-group {
 	width: 100%;
 	padding: 10px;
 }
 
-.settings-group__id-input-label {
-	width: 100%;
-	margin-bottom: 0px;
-}
-.settings-group__id-input-field {
-	width: 100%;
-}
-
-.settings-group__request-label {
-	width: 100%;
-	margin-bottom: 0px;
+.settings-group__request-settings-label {
+	/* width: 100%;
+	margin-bottom: 0px; */
 }
 .settings-group__request-method-select {
 	display: block;
@@ -151,6 +242,8 @@ button i {
 	margin: 0 auto;
 	margin-top: 5px;
 }
+
+/* END: Sidebar panel */
 
 /* START: Bottom panel */
 
