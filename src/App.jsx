@@ -26,6 +26,10 @@ import "./App.css";
 // address the potential problem with using float: right on the params remove button
 // read more on this binding for methods, since it's a bit confusing
 // update body content to support different content types (for now it's just JSON)
+// When entering something into the url field where the params are, an invisible value gets added to the state
+//     update the params method to only output the final param string
+//     add a some sort of a indication/coloration to the param part of the url
+// patch space left mouse movement
 /*###########################################################################################*/
 // rename sidebar inspector -> sidebar panel
 // Implement sidebar inspector resizing
@@ -111,6 +115,10 @@ class App extends React.Component {
 					.valid("REQUEST_TRACER", "SCRIPTS", "DATA_BAGS")
 					.required(),
 			}).required(),
+			runner: Joi.object({
+				isPlaying: Joi.bool().required(),
+				currentNodeId: Joi.string().required(),
+			}),
 		});
 
 		const initialState = {
@@ -138,8 +146,8 @@ class App extends React.Component {
 						bodyContent: "{a: 1}",
 					},
 					nodePos: {
-						x: 0,
-						y: 0,
+						x: 200,
+						y: 300,
 					},
 					outletPinNames: ["1", "2"],
 				},
@@ -160,8 +168,8 @@ class App extends React.Component {
 						bodyContent: "{b: 2}",
 					},
 					nodePos: {
-						x: 250,
-						y: 0,
+						x: 750,
+						y: 300,
 					},
 					outletPinNames: ["a", "b"],
 				},
@@ -182,15 +190,15 @@ class App extends React.Component {
 						bodyContent: "{c: 3}",
 					},
 					nodePos: {
-						x: 250,
-						y: 200,
+						x: 500,
+						y: 400,
 					},
 					outletPinNames: ["x", "y", "z"],
 				},
 			],
 			startNode: {
 				position: {
-					x: 100,
+					x: 50,
 					y: 300,
 				},
 			},
@@ -209,6 +217,7 @@ class App extends React.Component {
 			cableConnections: [
 				["3/outletPin/x", "2/inletPin"],
 				["1/outletPin/1", "3/inletPin"],
+				["start/outletPin", "1/inletPin"],
 			],
 			sidebarPanel: {
 				isDragging: false,
@@ -220,6 +229,10 @@ class App extends React.Component {
 				mouseDragLastPositionY: 0,
 				height: 100,
 				activeTab: "REQUEST_TRACER",
+			},
+			runner: {
+				isPlaying: false,
+				currentNodeId: "start",
 			},
 		};
 
@@ -255,7 +268,9 @@ class App extends React.Component {
 		this.toggleInspectedNodeParam = this.toggleInspectedNodeParam.bind(
 			this
 		);
-		this.updateInspectedNodeBodyContent = this.updateInspectedNodeBodyContent.bind(this);
+		this.updateInspectedNodeBodyContent = this.updateInspectedNodeBodyContent.bind(
+			this
+		);
 		this.updateInspectedNodeOutletPinName = this.updateInspectedNodeOutletPinName.bind(
 			this
 		);
@@ -267,6 +282,9 @@ class App extends React.Component {
 		this.startSidebarPanelDrag = this.startSidebarPanelDrag.bind(this);
 		this.startBottomPanelDrag = this.startBottomPanelDrag.bind(this);
 		this.setBottomPanelActiveTab = this.setBottomPanelActiveTab.bind(this);
+		this.playRunner = this.playRunner.bind(this);
+		this.pauseRunner = this.pauseRunner.bind(this);
+		this.runNextNode = this.runNextNode.bind(this);
 
 		//////// Util ////////////
 		this.getInspectedNode = this.getInspectedNode.bind(this);
@@ -357,6 +375,16 @@ class App extends React.Component {
 				);
 			}
 		});
+	}
+
+	componentDidUpdate(prevProps, prevState) {
+		// Typical usage (don't forget to compare props):
+		if (this.state.runner.isPlaying !== prevState.runner.isPlaying) {
+			console.log(this.state.runner.isPlaying);
+			if (!prevState.runner.isPlaying) {
+				this.runNextNode();
+			}
+		}
 	}
 
 	getMousePos(e) {
@@ -634,12 +662,36 @@ class App extends React.Component {
 	}
 
 	addCableConnection(target) {
-		const originType =
-			(this.state.cableDrag.origin.match(/\//g) || []).length === 1
-				? "inlet"
-				: "outlet";
-		const targetType =
-			(target.match(/\//g) || []).length === 1 ? "inlet" : "outlet";
+		let originType;
+		// Start nodes
+		const origin = this.state.cableDrag.origin;
+		if (origin.substring(0, origin.indexOf("/")) === "start") {
+			originType =
+				origin.substring(origin.indexOf("/") + 1, origin.length) ===
+				"inletPin"
+					? "inlet"
+					: "outlet";
+		} else {
+			// Request nodes
+			originType =
+				(this.state.cableDrag.origin.match(/\//g) || []).length === 1
+					? "inlet"
+					: "outlet";
+		}
+
+		let targetType;
+		// Start nodes
+		if (target.substring(0, target.indexOf("/")) === "start") {
+			targetType =
+				target.substring(target.indexOf("/") + 1, target.length) ===
+				"inletPin"
+					? "inlet"
+					: "outlet";
+		} else {
+			// Request nodes
+			targetType =
+				(target.match(/\//g) || []).length === 1 ? "inlet" : "outlet";
+		}
 
 		let newCableConnection;
 		if (originType === "inlet" && targetType === "outlet") {
@@ -665,15 +717,45 @@ class App extends React.Component {
 	}
 
 	getPinPosition(pin) {
+		// Code to run only for the start node
+		if (pin.substring(0, pin.indexOf("/")) === "start") {
+			const type =
+				pin.substring(pin.indexOf("/") + 1, pin.length) === "inletPin"
+					? "inlet"
+					: "outlet";
+			if (type === "inlet") {
+				const node = this.state.startNode;
+				const pinOffset = 15;
+				const startNodeBoxHeight = 100;
+				const position = {
+					x: node.position.x - pinOffset + 5,
+					y: node.position.y + startNodeBoxHeight / 2 + 5,
+				};
+				return position;
+			} else if (type === "outlet") {
+				const node = this.state.startNode;
+				const pinOffset = 15;
+				const startNodeBoxWidth = 100;
+				const startNodeBoxHeight = 100;
+				const position = {
+					x: node.position.x + startNodeBoxWidth + pinOffset - 5,
+					y: node.position.y + startNodeBoxHeight / 2 + 5,
+				};
+				return position;
+			}
+		}
+
+		// Otherwise run the code for anything kind of pin that isn't on the start node (request nodes)
 		const type = (pin.match(/\//g) || []).length === 1 ? "inlet" : "outlet";
 		//console.log("type:", type, pin);
 		if (type === "inlet") {
 			const [nodeId, ,] = pin.split("/");
 			const node = this.state.nodes.find((n) => n.id === nodeId);
 			const pinOffset = 15;
+			const nodeBoxHeight = 150;
 			const position = {
 				x: node.nodePos.x - pinOffset + 5,
-				y: node.nodePos.y + 150 / 2 + 5,
+				y: node.nodePos.y + nodeBoxHeight / 2 + 5,
 			};
 			//console.log(position);
 			return position;
@@ -682,6 +764,7 @@ class App extends React.Component {
 			//console.log(nodeId, outletPinName);
 			const node = this.state.nodes.find((n) => n.id === nodeId);
 			const nodeBoxWidth = 200;
+			const nodeBoxHeight = 150;
 			const pinOffset = 15;
 			// (node.outletPinNames.indexOf(outletPinName) + 1) *
 			// 	(150 / (node.outletPinNames.length + 1)) -
@@ -691,7 +774,7 @@ class App extends React.Component {
 				y:
 					node.nodePos.y +
 					(node.outletPinNames.indexOf(outletPinName) + 1) *
-						(150 / (node.outletPinNames.length + 1)),
+						(nodeBoxHeight / (node.outletPinNames.length + 1)),
 			};
 			//console.log(position);
 			return position;
@@ -726,6 +809,58 @@ class App extends React.Component {
 				draftState.bottomPanel.activeTab = tabName;
 			})
 		);
+	}
+
+	playRunner() {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.runner.isPlaying = true;
+			})
+		);
+	}
+	pauseRunner() {
+		this.setState((curState) =>
+			produce(curState, (draftState) => {
+				draftState.runner.isPlaying = false;
+			})
+		);
+	}
+
+	runNextNode() {
+		if (this.state.runner.currentNodeId === "start") {
+			const firstNodePin = this.state.cableConnections.find(
+				(cC) => cC[0].substring(0, cC[0].indexOf("/")) === "start"
+			)[1];
+			console.log("!1", firstNodePin);
+			const firstNodeId = firstNodePin.substring(
+				0,
+				firstNodePin.indexOf("/")
+			);
+			console.log("!2", firstNodeId);
+			console.log(firstNodeId);
+			const firstNode = this.state.nodes.find(
+				(n) => n.id === firstNodeId
+			);
+			console.log("!3", firstNode);
+			fetch(
+				this.appendParamsToUrl(
+					firstNode.reqSettings.url,
+					firstNode.reqSettings.params
+				)
+			)
+				.then(function (response) {
+					// The API call was successful!
+					return response.text();
+				})
+				.then(function (html) {
+					// This is the HTML from our response as a text string
+					console.log(html);
+				})
+				.catch(function (err) {
+					// There was an error
+					console.warn("Something went wrong.", err);
+				});
+		}
 	}
 
 	//////// Util ////////////
@@ -956,8 +1091,51 @@ class App extends React.Component {
 							start
 						</div>
 						<div className="start-node-body"></div>
-						<div className="start-node-box__inlet-pin"></div>
-						<div className="start-node-box__outlet-pin"></div>
+						<div
+							className="start-node-box__inlet-pin"
+							title="inlet pin"
+							onMouseDown={(e) =>
+								this.startCableDrag(e, `start/inletPin`)
+							}
+							onMouseUp={(e) =>
+								this.addCableConnection(`start/inletPin`)
+							}
+						></div>
+						<div
+							className="start-node-box__outlet-pin"
+							title="outlet pin"
+							onMouseDown={(e) =>
+								this.startCableDrag(e, `start/outletPin`)
+							}
+							onMouseUp={(e) =>
+								this.addCableConnection(`start/outletPin`)
+							}
+						></div>
+					</div>
+					<div className="playback-toolbar">
+						<button
+							className="playback-toolbar__play-pause"
+							onClick={() =>
+								!this.state.runner.isPlaying
+									? this.playRunner()
+									: this.pauseRunner()
+							}
+						>
+							<i
+								className={`fa fa-${
+									!this.state.runner.isPlaying
+										? "play"
+										: "pause"
+								}`}
+								aria-hidden="true"
+							></i>
+						</button>
+						<button className="playback-toolbar__stop">
+							<i className="fa fa-stop" aria-hidden="true"></i>
+						</button>
+						<button className="playback-toolbar__step">
+							<i className="fa fa-forward" aria-hidden="true"></i>
+						</button>
 					</div>
 					<button className="expand-space-x">
 						<i
@@ -1007,7 +1185,16 @@ class App extends React.Component {
 											.toggleInspectedNodeReqSettingsIsCollapsed
 									}
 								>
-									Request Settings:
+									<i
+										class={`fa fa-caret-${
+											!this.getInspectedNode().reqSettings
+												.isCollapsed
+												? "down"
+												: "right"
+										}`}
+										aria-hidden="true"
+									></i>
+									&nbsp; Request Settings:
 								</div>
 								{!this.getInspectedNode().reqSettings
 									.isCollapsed ? (

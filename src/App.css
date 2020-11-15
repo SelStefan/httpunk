@@ -51,6 +51,31 @@
 	background-color: #fffff9;
 }
 
+.playback-toolbar {
+	display: flex;
+	justify-content: space-between;
+	position: absolute;
+	bottom: 10px;
+	left: 0;
+	right: 0;
+	width: 120px;
+	height: 37px;
+	border: 1px solid green;
+	margin: auto;
+}
+.playback-toolbar__play-pause {
+	width: 35px;
+	height: 35px;
+}
+.playback-toolbar__stop {
+	width: 35px;
+	height: 35px;
+}
+.playback-toolbar__step {
+	width: 35px;
+	height: 35px;
+}
+
 .expand-space-x {
 	display: inline-block;
 	position: absolute;
@@ -141,7 +166,7 @@ button i {
 }
 
 .request-settings__label {
-	width: 100%;
+	width: auto;
 	margin-bottom: 5px;
 	margin-left: 10px;
 }
