@@ -1,0 +1,154 @@
+.patch-space {
+	display: inline-block;
+	position: relative;
+	/* height: 100%; */
+	/* margin-right: 300px; */
+	overflow: scroll;
+	/* #fefeee */
+	background-color: #fffff9;
+}
+
+.playback-toolbar {
+	display: flex;
+	justify-content: space-between;
+	position: absolute;
+	bottom: 10px;
+	left: 0;
+	right: 0;
+	width: 120px;
+	height: 37px;
+	border: 1px solid green;
+	margin: auto;
+}
+.playback-toolbar__play-pause {
+	width: 35px;
+	height: 35px;
+}
+.playback-toolbar__stop {
+	width: 35px;
+	height: 35px;
+}
+.playback-toolbar__step {
+	width: 35px;
+	height: 35px;
+}
+
+.expand-space-x {
+	display: inline-block;
+	position: absolute;
+	right: 10px;
+	bottom: 40px;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	margin: auto auto;
+	font-size: 25px;
+}
+.expand-space-y {
+	display: inline-block;
+	position: absolute;
+	right: 40px;
+	bottom: 10px;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	margin: auto auto;
+	font-size: 25px;
+}
+
+button i {
+	display: inline-block;
+	width: 100%;
+}
+
+.box {
+	position: absolute;
+	width: 200px;
+	height: 150px;
+	border: 1px solid black;
+}
+.start-node-box {
+	position: absolute;
+	width: 100px;
+	height: 100px;
+	border: 1px solid black;
+}
+
+.header {
+	width: 100%;
+	height: 50px;
+	border: 1px solid red;
+}
+.start-node-header {
+	width: 100%;
+	height: 30px;
+	border: 1px solid red;
+}
+.header__id-display-box {
+	width: 100%;
+	height: 25px;
+	border: 1px solid yellow;
+	/* pointer-events: none; */
+}
+.header__request-method-display-box {
+	display: inline-block;
+	width: 61px;
+	height: 25px;
+	vertical-align: top;
+	font-size: small;
+	padding-top: 2px;
+	border: 1px solid green;
+	/* pointer-events: none; */
+}
+.header__url-display-box {
+	display: inline-block;
+	width: 135px;
+	height: 25px;
+	border: 1px solid green;
+	overflow: hidden;
+	/* pointer-events: none; */
+}
+
+.body {
+	width: 100%;
+	height: 100px;
+	border: 1px solid green;
+}
+.start-node-body {
+	width: 100%;
+	height: 70px;
+	border: 1px solid green;
+}
+
+.node-box__inlet-pin {
+	position: absolute;
+	width: 10px;
+	height: 10px;
+	background-color: black;
+	left: -15px;
+	top: 72px;
+}
+.node-box__outlet-pin {
+	position: absolute;
+	width: 10px;
+	height: 10px;
+	background-color: black;
+	right: -15px;
+	/* top: 72px; */
+}
+.start-node-box__inlet-pin {
+	position: absolute;
+	width: 10px;
+	height: 10px;
+	background-color: black;
+	left: -15px;
+	top: 47px;
+}
+.start-node-box__outlet-pin {
+	position: absolute;
+	width: 10px;
+	height: 10px;
+	background-color: black;
+	right: -15px;
+	top: 47px;
+}

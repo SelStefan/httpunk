@@ -1,0 +1,161 @@
+.sidebar-panel {
+	/* display: inline-block; */
+	position: absolute;
+	top: 0;
+	right: 0;
+	/* width: 300px; */
+	/* height: 100%; */
+	background-color: #ddd;
+	overflow-y: scroll;
+	/* overflow: scroll; */
+}
+
+.sidebar-panel__drag {
+    position: absolute;
+	left: -4px;
+	top: 0;
+	bottom: 0;
+    /* top: -4px;
+    right: 0; */
+    width: 8px;
+	cursor: e-resize;
+	background-color: red;
+}
+
+.node-id {
+	width: 100%;
+	padding: 10px;
+}
+.node-id__label {
+	width: 100%;
+	margin-bottom: 0px;
+}
+.node-id__input-field {
+	width: 100%;
+}
+
+/*  */
+
+.request-settings-container {
+	width: 100%;
+	margin-bottom: 0px;
+}
+
+.request-settings-container__request-settings-label {
+	width: 100%;
+	margin-bottom: 0px;
+	margin-left: 10px;
+}
+
+.request-settings-container__settings-tabs {
+	width: 100%;
+	padding: 0 10px;
+}
+
+.request-settings {
+	width: 100%;
+	margin-bottom: 0px;
+}
+
+.request-settings__label {
+	width: auto;
+	margin-bottom: 5px;
+	margin-left: 10px;
+}
+
+.request-settings__url {
+	width: 100%;
+	padding: 0px 10px 5px 10px;
+}
+
+.request-settings__method-select {
+	display: block;
+	margin-top: 3px;
+}
+
+.request-settings__url-input-field {
+	display: block;
+	width: 100%;
+	margin-top: 2px;
+}
+
+.request-settings__tabs {
+	width: 100%;
+	padding: 0 10px;
+}
+.request-settings__tab {
+
+}
+.request-settings__tab--active {
+	border-color: red;
+}
+
+.request-settings__params {
+	width: 100%;
+	padding: 0 10px;
+	margin: 2px 0 7px 0;
+}
+.request-settings__params-key-field {
+	width: 100%;
+}
+.request-settings__params-value-field {
+	width: 100%;
+}
+.request-settings__params-toggle-button {
+	width: 45%;
+	margin-top: 2px;
+}
+.request-settings__params-remove-button {
+	float: right;
+	width: 45%;
+	margin-top: 2px;
+}
+
+.request-settings__body-container {
+	width: 100%;
+	padding: 0 10px;
+	margin: 2px 0 7px 0;
+}
+.request-settings__body {
+	width: 100%;
+	height: 150px;
+}
+
+/*  */
+
+.settings-group {
+	width: 100%;
+	padding: 10px;
+}
+
+.settings-group__request-settings-label {
+	/* width: 100%;
+	margin-bottom: 0px; */
+}
+.settings-group__request-method-select {
+	display: block;
+	margin-top: 3px;
+	/* width: 80px; */
+}
+.settings-group__url-input-field {
+	display: block;
+	width: 100%;
+	margin-top: 2px;
+}
+
+.settings-group__outlet-pins-label {
+	width: 100%;
+	margin-bottom: 0px;
+}
+.settings-group__outlet-pin-name-input-field {
+	width: 188px;
+	margin-right: 5px;
+}
+.settings-group__outlet-pin-delete-button {
+	width: 70px;
+}
+.settings-group__outlet-pin-add-button {
+	display: block;
+	margin: 0 auto;
+	margin-top: 5px;
+}
